@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Integration Server Tester</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        button { padding: 10px 20px; margin: 10px; background: #007cba; color: white; border: none; cursor: pointer; }
+        button:hover { background: #005a87; }
+        .result { background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Integration Server Tester</h1>
+    
+    <div>
+        <button onclick="testHealth()">Test Server Health</button>
+        <button onclick="testJenkins()">Test Jenkins Status</button>
+        <button onclick="testMondayItems()">Test Monday.com Items</button>
+    </div>
+
+    <div>
+        <h3>Create Pipeline Item</h3>
+        <input type="text" id="featureName" placeholder="Feature Name" value="Test Feature">
+        <input type="text" id="developer" placeholder="Developer" value="aniket-upstreamtech03">
+        <button onclick="createPipelineItem()">Create Item</button>
+    </div>
+
+    <div>
+        <h3>Simulate GitHub Webhook</h3>
+        <button onclick="simulateGitHubPush()">Simulate GitHub Push</button>
+    </div>
+
+    <div id="results"></div>
+
+    <script>
+        const BASE_URL = 'https://upstream-mondaysession-98223080.loca.lt';
+
+        async function makeRequest(url, options = {}) {
+            try {
+                const response = await fetch(url, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    },
+                    ...options
+                });
+                const data = await response.json();
+                showResult(JSON.stringify(data, null, 2));
+            } catch (error) {
+                showResult('Error: ' + error.message);
+            }
+        }
+
+        function showResult(data) {
+            document.getElementById('results').innerHTML = `<div class="result"><pre>${data}</pre></div>`;
+        }
+
+        function testHealth() {
+            makeRequest(BASE_URL + '/health');
+        }
+
+        function testJenkins() {
+            makeRequest(BASE_URL + '/api/jenkins/status');
+        }
+
+        function testMondayItems() {
+            makeRequest(BASE_URL + '/api/monday/items');
+        }
+
+        function createPipelineItem() {
+            const featureName = document.getElementById('featureName').value;
+            const developer = document.getElementById('developer').value;
+            
+            makeRequest(BASE_URL + '/api/monday/items', {
+                method: 'POST',
+                body: JSON.stringify({
+                    featureName: featureName,
+                    developer: developer,
+                    description: 'Testing integration pipeline'
+                })
+            });
+        }
+
+        function simulateGitHubPush() {
+            makeRequest(BASE_URL + '/api/webhooks/simulate/github', {
+                method: 'POST',
+                body: JSON.stringify({
+                    eventType: 'push',
+                    payload: {
+                        ref: 'refs/heads/main',
+                        head_commit: {
+                            message: 'feat: Test integration from web interface',
+                            author: { username: 'aniket-upstreamtech03' }
+                        },
+                        repository: {
+                            full_name: 'aniket-upstreamtech03/Sample-test',
+                            html_url: 'https://github.com/aniket-upstreamtech03/Sample-test'
+                        },
+                        sender: { login: 'aniket-upstreamtech03' }
+                    }
+                })
+            });
+        }
+    </script>
+</body>
+</html>
