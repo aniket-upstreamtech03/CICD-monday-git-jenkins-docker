@@ -207,7 +207,7 @@ class GitHubController {
       [MONDAY_COLUMNS.DEVELOPER]: webhookData.developer,
       [MONDAY_COLUMNS.COMMIT_MESSAGE]: webhookData.commitMessage,
       [MONDAY_COLUMNS.PR_URL]: webhookData.prUrl || '',
-      [MONDAY_COLUMNS.BUILD_STATUS]: { label: 'Pending' },
+      [MONDAY_COLUMNS.BUILD_STATUS]: { label: 'Build Pending' },
       [MONDAY_COLUMNS.REPO_NAME]: repoName,
       [MONDAY_COLUMNS.REPO_URL]: repoUrl,
       [MONDAY_COLUMNS.JENKINS_JOB_NAME]: jenkinsJobName || ''
@@ -263,7 +263,7 @@ class GitHubController {
           [MONDAY_COLUMNS.GITHUB_STATUS]: { label: 'Completed' },
           [MONDAY_COLUMNS.COMMIT_MESSAGE]: webhookData.commitMessage,
           [MONDAY_COLUMNS.JENKINS_STATUS]: { label: 'Building' },
-          [MONDAY_COLUMNS.BUILD_STATUS]: { label: 'Running' },
+          [MONDAY_COLUMNS.BUILD_STATUS]: { label: 'Build Running' },
           [MONDAY_COLUMNS.REPO_NAME]: repoName,
           [MONDAY_COLUMNS.REPO_URL]: repoUrl,
           [MONDAY_COLUMNS.JENKINS_JOB_NAME]: jenkinsJobName || ''
@@ -398,13 +398,14 @@ class GitHubController {
       console.log(`🔍 Monitoring Jenkins build #${buildNumber}: ${buildUrl}`);
 
       // Update Monday.com with build started
+      // Pass featureName as both parameters so it gets extracted properly
       const startedColumnValues = mondayService.buildColumnValues('jenkins_started', {
         buildNumber: buildNumber.toString(),
         buildUrl: buildUrl,
         jenkinsJobName: jenkinsJobName
       });
 
-      await mondayService.updatePipelineItem(featureName, startedColumnValues);
+      await mondayService.updatePipelineItem(featureName, startedColumnValues, '', featureName);
 
       // Monitor build until completion - USING DYNAMIC JOB NAME
       const finalBuildInfo = await jenkinsService.monitorBuild(
@@ -414,6 +415,29 @@ class GitHubController {
 
       console.log(`🏁 Build completed: ${finalBuildInfo.result}`);
 
+      // Get test results from Jenkins
+      const testResults = await jenkinsService.getTestResults(jenkinsJobName, buildNumber);
+      let testCount = 'N/A';
+      let testPassed = true;
+      
+      if (testResults.success && testResults.data.totalTests > 0) {
+        const { passedTests, failedTests, totalTests } = testResults.data;
+        testCount = `${passedTests}/${totalTests}`;
+        testPassed = failedTests === 0;
+        console.log(`📊 Test Results: ${testCount} (${failedTests} failed)`);
+      } else {
+        console.log(`📊 No test results available`);
+      }
+
+      // Update Monday.com with test results first if available
+      if (testResults.data.totalTests > 0) {
+        const testColumnValues = mondayService.buildColumnValues('tests_completed', {
+          passed: testPassed,
+          testCount: testCount
+        });
+        await mondayService.updatePipelineItem(featureName, testColumnValues, '', featureName);
+      }
+
       // Update Monday.com with final build status
       const buildColumnValues = mondayService.buildColumnValues('build_completed', {
         success: finalBuildInfo.result === 'SUCCESS',
@@ -422,7 +446,7 @@ class GitHubController {
         buildUrl: finalBuildInfo.url
       });
 
-      await mondayService.updatePipelineItem(featureName, buildColumnValues);
+      await mondayService.updatePipelineItem(featureName, buildColumnValues, '', featureName);
 
       // If build succeeded, fetch Docker container info and update Monday.com
       if (finalBuildInfo.result === 'SUCCESS') {
@@ -473,7 +497,7 @@ class GitHubController {
             });
             
             // Update Monday.com with Docker info
-            await mondayService.updatePipelineItem(featureName, dockerColumnValues);
+            await mondayService.updatePipelineItem(featureName, dockerColumnValues, '', featureName);
             console.log('✅ Monday.com updated with Docker container details');
           } else {
             console.log('⚠️ Could not retrieve Docker container info:', dockerInfo.error);
@@ -492,7 +516,7 @@ class GitHubController {
       );
 
       if (stagesInfo.success) {
-        await this.updateBuildStages(featureName, stagesInfo.data);
+        await this.updateBuildStages(featureName, stagesInfo.data, featureName);
       }
 
       console.log(`✅ Build monitoring completed for: ${featureName}`);
@@ -505,12 +529,12 @@ class GitHubController {
         success: false
       });
 
-      await mondayService.updatePipelineItem(featureName, errorColumnValues);
+      await mondayService.updatePipelineItem(featureName, errorColumnValues, '', featureName);
     }
   }
 
   // Update build stages in Monday.com
-  async updateBuildStages(featureName, stages) {
+  async updateBuildStages(featureName, stages, branchName = '') {
     try {
       console.log(`🔄 Updating build stages for: ${featureName}`, stages.length);
       
@@ -522,8 +546,7 @@ class GitHubController {
           stageType = 'tests_completed';
           stageData = {
             passed: stage.status === 'SUCCESS',
-            passedTests: stage.status === 'SUCCESS' ? 'All' : '0',
-            totalTests: 'Multiple'
+            testCount: stage.status === 'SUCCESS' ? 'All Tests Passed' : 'Tests Failed'
           };
         } else if (stage.name.toLowerCase().includes('build')) {
           stageType = 'build_completed';
@@ -546,7 +569,7 @@ class GitHubController {
 
         if (stageType) {
           const columnValues = mondayService.buildColumnValues(stageType, stageData);
-          await mondayService.updatePipelineItem(featureName, columnValues);
+          await mondayService.updatePipelineItem(featureName, columnValues, '', branchName || featureName);
           
           console.log(`✅ Updated stage: ${stage.name} - ${stage.status}`);
           
