@@ -211,6 +211,35 @@ async triggerBuild(jobName = JENKINS_CONFIG.JOB_NAME, parameters = {}) {
       await checkBuild();
     });
   }
+
+  // Get test results from build
+  async getTestResults(jobName, buildNumber) {
+    try {
+      const response = await this.api.get(`/job/${jobName}/${buildNumber}/testReport/api/json`);
+      const testData = response.data;
+      
+      return {
+        success: true,
+        data: {
+          totalTests: testData.totalCount || 0,
+          passedTests: testData.passCount || 0,
+          failedTests: testData.failCount || 0,
+          skippedTests: testData.skipCount || 0
+        }
+      };
+    } catch (error) {
+      // If no test report exists, return 0 tests
+      return {
+        success: true,
+        data: {
+          totalTests: 0,
+          passedTests: 0,
+          failedTests: 0,
+          skippedTests: 0
+        }
+      };
+    }
+  }
 }
 
 module.exports = new JenkinsService();

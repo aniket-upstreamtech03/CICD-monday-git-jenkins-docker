@@ -12,6 +12,29 @@ class MondayService {
     });
   }
 
+  /**
+   * Extract item name from branch name by removing last 9-10 digits (Monday.com item ID)
+   * Examples:
+   * - "test-1234567890" -> "test"
+   * - "test-982239713" -> "test"
+   * - "test-check-git-native-2510556391" -> "test-check-git-native"
+   * - "feature-abc" -> "feature-abc" (no change if doesn't end with 9-10 digits)
+   */
+  extractItemNameFromBranch(branchName) {
+    if (!branchName) return '';
+    
+    // Pattern to match last 9-10 digits optionally preceded by dash or underscore
+    // Monday.com item IDs can be 9 or 10 digits
+    const pattern = /[-_]?\d{9,10}$/;
+    
+    // Remove the last 9-10 digits if present
+    const itemName = branchName.replace(pattern, '');
+    
+    console.log(`🔧 Branch name parsing: "${branchName}" -> "${itemName}"`);
+    
+    return itemName;
+  }
+
   // Create a new item in Monday.com board - FIXED FORMATS
   async createItem(featureName, columnValues = {}) {
     try {
@@ -236,10 +259,10 @@ class MondayService {
     }
   }
 
-  // Find item by feature name - FIXED WITH NULL SAFETY
-  async findItemByFeatureName(featureName) {
+  // Find item by feature name - UPDATED TO MATCH BY ITEM NAME PREFIX
+  async findItemByFeatureName(searchName) {
     try {
-      console.log(`🔍 Searching for existing item: ${featureName}`);
+      console.log(`🔍 Searching for existing item: ${searchName}`);
       
       const itemsResponse = await this.getBoardItems();
       
@@ -279,35 +302,15 @@ class MondayService {
         console.log('📋 Sample items:', items.slice(0, 3).map(i => i.name).join(', '));
       }
 
-      // Try exact match first
-      let item = items.find(item => item.name === featureName);
+      // NEW LOGIC: Try exact match first
+      let item = items.find(item => item.name === searchName);
       
       if (item) {
-        console.log(`✅ Found exact match: ${featureName} -> ${item.name}`);
+        console.log(`✅ Found exact match: "${searchName}" -> "${item.name}" (ID: ${item.id})`);
         return { success: true, data: item };
       }
 
-      // If not found, try PR number matching
-      const prMatch = featureName.match(/PR-(\d+)/);
-      if (prMatch) {
-        const prNumber = prMatch[1];
-        console.log(`🔍 Looking for PR-${prNumber} in existing items...`);
-        
-        // Check if any item name contains this PR number
-        item = items.find(item => {
-          const itemName = item.name;
-          return itemName.includes(`PR-${prNumber}`) || 
-                 itemName.includes(`#${prNumber}`) ||
-                 (prNumber && itemName.includes(prNumber));
-        });
-        
-        if (item) {
-          console.log(`✅ Found PR match: PR-${prNumber} -> ${item.name}`);
-          return { success: true, data: item };
-        }
-      }
-
-      console.log(`❌ No existing item found for: ${featureName}`);
+      console.log(`❌ No existing item found with name: "${searchName}"`);
       return { success: true, data: null };
 
     } catch (error) {
@@ -319,7 +322,7 @@ class MondayService {
     }
   }
 
-  // Create or update item for CI/CD pipeline - FIXED WITH BRANCH NAME LOGIC
+  // Create or update item for CI/CD pipeline - UPDATED WITH NEW BRANCH NAME PARSING
   async updatePipelineItem(featureName, updates, commitId = '', branchName = '') {
     try {
       console.log('\n═══════════════════════════════════════════');
@@ -330,19 +333,21 @@ class MondayService {
       console.log(`💾 Commit ID: ${commitId.substring(0, 8)}`);
       console.log(`📊 Updates:`, JSON.stringify(updates, null, 2));
 
-      // IMPORTANT: Use branch name as item name if provided
-      const itemName = branchName || featureName;
-      console.log(`\n📝 Final Item Name: "${itemName}"`);
-
-      // Find existing item by branch name first, then by feature name
-      console.log(`\n🔍 Step 1: Searching for existing item...`);
-      let existingItem = await this.findItemByFeatureName(itemName);
-      
-      // If not found by branch name, try feature name
-      if (existingItem.success && !existingItem.data && branchName && branchName !== featureName) {
-        console.log(`\n🔄 Not found by branch name, trying feature name: ${featureName}`);
-        existingItem = await this.findItemByFeatureName(featureName);
+      // NEW LOGIC: Extract item name from branch name by removing last 10 digits
+      // Example: "test-1234567890" -> "test"
+      // Example: "test-check-git-native-2510556391" -> "test-check-git-native"
+      let itemName;
+      if (branchName) {
+        itemName = this.extractItemNameFromBranch(branchName);
+        console.log(`\n📝 Extracted Item Name from Branch: "${itemName}"`);
+      } else {
+        itemName = featureName;
+        console.log(`\n📝 Using Feature Name as Item Name: "${itemName}"`);
       }
+
+      // Find existing item by extracted item name
+      console.log(`\n🔍 Step 1: Searching for existing item by name: "${itemName}"...`);
+      let existingItem = await this.findItemByFeatureName(itemName);
       
       if (!existingItem.success) {
         console.error(`\n❌ FAILED at Step 1: Cannot search for items`);
@@ -448,7 +453,7 @@ class MondayService {
           [MONDAY_COLUMNS.DEVELOPER]: data.developer || '',
           [MONDAY_COLUMNS.COMMIT_MESSAGE]: data.commitMessage || '',
           [MONDAY_COLUMNS.PR_URL]: data.prUrl || '',
-          [MONDAY_COLUMNS.BUILD_STATUS]: { label: STATUS.STAGE.PENDING },
+          [MONDAY_COLUMNS.BUILD_STATUS]: { label: 'Build Pending' },
           [MONDAY_COLUMNS.REPO_NAME]: data.repoName || '',
           [MONDAY_COLUMNS.REPO_URL]: data.repoUrl || '',
           [MONDAY_COLUMNS.JENKINS_JOB_NAME]: data.jenkinsJobName || ''
@@ -461,7 +466,7 @@ class MondayService {
           [MONDAY_COLUMNS.DEVELOPER]: data.developer || 'Unknown',
           [MONDAY_COLUMNS.COMMIT_MESSAGE]: data.commitMessage || 'No message',
           [MONDAY_COLUMNS.PR_URL]: data.prUrl || '',
-          [MONDAY_COLUMNS.BUILD_STATUS]: { label: STATUS.STAGE.PENDING },
+          [MONDAY_COLUMNS.BUILD_STATUS]: { label: 'Build Pending' },
           [MONDAY_COLUMNS.REPO_NAME]: data.repoName || '',
           [MONDAY_COLUMNS.REPO_URL]: data.repoUrl || ''
         };
@@ -482,8 +487,8 @@ class MondayService {
         return {
           ...baseValues,
           [MONDAY_COLUMNS.JENKINS_STATUS]: { label: STATUS.JENKINS.BUILDING },
-          [MONDAY_COLUMNS.BUILD_STATUS]: { label: STATUS.STAGE.RUNNING },
-          [MONDAY_COLUMNS.TEST_STATUS]: { label: STATUS.STAGE.RUNNING },
+          [MONDAY_COLUMNS.BUILD_STATUS]: { label: 'Build Running' },
+          [MONDAY_COLUMNS.TEST_STATUS]: { label: 'Test Running' },
           [MONDAY_COLUMNS.BUILD_NUMBER]: data.buildNumber || 'Starting...',
           [MONDAY_COLUMNS.BUILD_URL]: data.buildUrl || '',
           [MONDAY_COLUMNS.JENKINS_JOB_NAME]: data.jenkinsJobName || ''
@@ -492,17 +497,17 @@ class MondayService {
       case 'tests_completed':
         return {
           ...baseValues,
-          [MONDAY_COLUMNS.TEST_STATUS]: { label: data.passed ? STATUS.STAGE.SUCCESS : STATUS.STAGE.FAILED },
-          [MONDAY_COLUMNS.TEST_COUNT]: data.passedTests ? `${data.passedTests}/${data.totalTests}` : 'N/A'
+          [MONDAY_COLUMNS.TEST_STATUS]: { label: data.passed ? 'Test Completed' : 'Test Failed' },
+          [MONDAY_COLUMNS.TEST_COUNT]: data.testCount || (data.passedTests ? `${data.passedTests}/${data.totalTests}` : 'N/A')
         };
 
       case 'build_completed':
         return {
           ...baseValues,
-          [MONDAY_COLUMNS.BUILD_STATUS]: { label: data.success ? STATUS.STAGE.SUCCESS : STATUS.STAGE.FAILED },
+          [MONDAY_COLUMNS.BUILD_STATUS]: { label: data.success ? 'Build Completed' : 'Build Failed' },
           [MONDAY_COLUMNS.JENKINS_STATUS]: { label: data.success ? STATUS.JENKINS.SUCCESS : STATUS.JENKINS.FAILED },
           [MONDAY_COLUMNS.BUILD_TIMELINE]: data.success ? 'Build completed successfully' : 'Build failed',
-          [MONDAY_COLUMNS.DEPLOY_STATUS]: { label: data.success ? STATUS.STAGE.SUCCESS : STATUS.STAGE.FAILED }
+          [MONDAY_COLUMNS.DEPLOY_STATUS]: { label: data.success ? 'Deploy Success' : 'Deploy Failed' }
         };
 
       case 'pipeline_completed':
@@ -522,7 +527,7 @@ class MondayService {
           [MONDAY_COLUMNS.HEALTH_STATUS]: data.health || 'healthy',
           [MONDAY_COLUMNS.RESOURCE_USAGE]: data.resourceUsage || 'N/A',
           [MONDAY_COLUMNS.DEPLOYMENT_TIMESTAMP]: data.deploymentTimestamp || new Date().toISOString().replace('T', ' ').substring(0, 19),
-          [MONDAY_COLUMNS.DEPLOY_STATUS]: { label: STATUS.STAGE.SUCCESS }
+          [MONDAY_COLUMNS.DEPLOY_STATUS]: { label: 'Deploy Completed' }
         };
 
       case 'docker_status_update':
@@ -537,7 +542,7 @@ class MondayService {
         return {
           ...baseValues,
           [MONDAY_COLUMNS.DOCKER_STATUS]: { label: STATUS.DOCKER.FAILED },
-          [MONDAY_COLUMNS.DEPLOY_STATUS]: { label: STATUS.STAGE.FAILED },
+          [MONDAY_COLUMNS.DEPLOY_STATUS]: { label: 'Deploy Failed' },
           [MONDAY_COLUMNS.BUILD_TIMELINE]: data.errorMessage || 'Docker deployment failed'
         };
 
