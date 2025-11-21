@@ -41,6 +41,17 @@ const STATUS = {
     SUCCESS: 'Success',
     FAILED: 'Failed',
     SKIPPED: 'Skipped'
+  },
+  DOCKER: {
+    RUNNING: 'Running',
+    STOPPED: 'Stopped',
+    FAILED: 'Failed',
+    STARTING: 'Starting',
+    RESTARTING: 'Restarting',
+    REMOVING: 'Removing',
+    PAUSED: 'Paused',
+    EXITED: 'Exited',
+    DEAD: 'Dead'
   }
 };
 
@@ -63,7 +74,16 @@ const MONDAY_COLUMNS = {
   BUILD_TIMELINE: 'text_mkxtt63z',
   REPO_NAME: 'text_mkxvrvpf',         // Repository name
   REPO_URL: 'text_mkxvh80n',          // Repository URL
-  JENKINS_JOB_NAME: 'text_mkxvbrz7'   // Jenkins job name
+  JENKINS_JOB_NAME: 'text_mkxvbrz7',  // Jenkins job name
+  
+  // Docker-related columns
+  DOCKER_STATUS: 'color_mkxwnrwk',       // Status column - Running, Stopped, Failed
+  CONTAINER_ID: 'text_mkxw8jf6',         // Text column - Docker container ID
+  DOCKER_IMAGE_VERSION: 'text_mkxwjwx7', // Text column - Docker image version/tag
+  EXPOSED_PORTS: 'text_mkxw4nkd',        // Text column - Container exposed ports
+  HEALTH_STATUS: 'text_mkxwtatd',        // Text column - Container health status
+  RESOURCE_USAGE: 'text_mkxwhj7v',       // Text column - CPU/Memory usage
+  DEPLOYMENT_TIMESTAMP: 'text_mkxwpw82' // Text column - When container was deployed
 };
 
 // Helper function to extract Jenkins job name from repository name

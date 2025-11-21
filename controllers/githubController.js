@@ -1,6 +1,7 @@
 const githubService = require('../services/githubService');
 const jenkinsService = require('../services/jenkinsService');
 const mondayService = require('../services/mondayService');
+const dockerService = require('../services/dockerService');
 const { STATUS, MONDAY_COLUMNS, getJenkinsJobFromRepo } = require('../config/constants');
 
 class GitHubController {
@@ -154,12 +155,16 @@ class GitHubController {
           githubStatus = 'Completed';
           statusMessage = 'PR Merged to Main';
           columnValues[MONDAY_COLUMNS.COMMIT_MESSAGE] = `Merged: ${webhookData.commitMessage}`;
+          // IMPORTANT: Preserve PR URL on merge
+          columnValues[MONDAY_COLUMNS.PR_URL] = webhookData.prUrl;
           if (webhookData.reviewer) {
             columnValues[MONDAY_COLUMNS.REVIEWER] = webhookData.reviewer;
           }
         } else {
           githubStatus = 'Closed';
           statusMessage = 'PR Closed Without Merge';
+          // Also preserve PR URL when closed without merge
+          columnValues[MONDAY_COLUMNS.PR_URL] = webhookData.prUrl;
         }
         break;
       
@@ -418,6 +423,67 @@ class GitHubController {
       });
 
       await mondayService.updatePipelineItem(featureName, buildColumnValues);
+
+      // If build succeeded, fetch Docker container info and update Monday.com
+      if (finalBuildInfo.result === 'SUCCESS') {
+        console.log('🐳 Fetching Docker container information...');
+        
+        // Extract repository name for container search
+        // Jenkins job name matches repo name (e.g., "Sample-jenkins-test")
+        // Container name pattern varies, so we'll search by repo name
+        console.log(`   Repository: ${repositoryName}`);
+        console.log(`   Jenkins Job: ${jenkinsJobName}`);
+        
+        // Wait a bit for container to be fully deployed
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        
+        try {
+          // List all containers and find the one matching repo name
+          const allContainers = await dockerService.listContainers();
+          if (allContainers.success) {
+            console.log('   Available containers:', allContainers.containers.map(c => c.name).join(', '));
+          }
+          
+          // Find container by repository name (case-insensitive search)
+          const containerName = await dockerService.findContainerByRepoName(jenkinsJobName, allContainers);
+          
+          if (!containerName) {
+            console.log(`⚠️  No container found matching repository: ${jenkinsJobName}`);
+            console.log('   Container might be on a different Docker host or using a different naming pattern.');
+            return;
+          }
+          
+          console.log(`   ✅ Found container: ${containerName}`);
+          
+          // Get full container info
+          const dockerInfo = await dockerService.getFullContainerInfo(containerName, jenkinsJobName);
+          
+          if (dockerInfo.success) {
+            console.log('✅ Docker container info retrieved:', dockerInfo.data);
+            
+            // Build Docker column values for Monday.com
+            const dockerColumnValues = mondayService.buildColumnValues('docker_deployed', {
+              dockerStatus: dockerInfo.data.status,
+              containerId: dockerInfo.data.containerId,
+              imageVersion: dockerInfo.data.imageVersion,
+              ports: dockerInfo.data.ports,
+              health: dockerInfo.data.health,
+              resourceUsage: dockerInfo.data.resourceUsage,
+              deploymentTimestamp: dockerInfo.data.deploymentTimestamp
+            });
+            
+            // Update Monday.com with Docker info
+            await mondayService.updatePipelineItem(featureName, dockerColumnValues);
+            console.log('✅ Monday.com updated with Docker container details');
+          } else {
+            console.log('⚠️ Could not retrieve Docker container info:', dockerInfo.error);
+            console.log('   This is expected if Docker deployment happens on a different machine.');
+          }
+        } catch (dockerError) {
+          console.log('⚠️ Docker info fetch failed:', dockerError.message);
+          console.log('   Container might be on a different host or not yet ready.');
+        }
+      }
 
       // Get detailed stage information - USING DYNAMIC JOB NAME
       const stagesInfo = await jenkinsService.getBuildStages(

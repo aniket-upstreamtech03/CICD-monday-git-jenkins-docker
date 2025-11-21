@@ -377,6 +377,18 @@ class MondayService {
         console.log(`   Item ID: ${itemId}`);
         console.log(`   Columns to update:`, Object.keys(columnValues).join(', '));
         
+        // CRITICAL FIX: Preserve PR URL if not in updates
+        // This prevents the PR URL from being cleared on subsequent updates (like merges)
+        if (!columnValues[MONDAY_COLUMNS.PR_URL] && existingItem.data.column_values) {
+          const prUrlColumn = existingItem.data.column_values.find(
+            col => col.id === MONDAY_COLUMNS.PR_URL
+          );
+          if (prUrlColumn && prUrlColumn.text) {
+            console.log(`   🔒 Preserving existing PR URL: ${prUrlColumn.text}`);
+            columnValues[MONDAY_COLUMNS.PR_URL] = prUrlColumn.text;
+          }
+        }
+        
         result = await this.updateItem(itemId, columnValues);
         
         if (result.success) {
@@ -498,6 +510,35 @@ class MondayService {
           ...baseValues,
           [MONDAY_COLUMNS.GITHUB_STATUS]: { label: data.success ? STATUS.GITHUB.COMPLETED : STATUS.GITHUB.CLOSED },
           [MONDAY_COLUMNS.JENKINS_STATUS]: { label: data.jenkinsStatus || STATUS.JENKINS.NOT_STARTED }
+        };
+
+      case 'docker_deployed':
+        return {
+          ...baseValues,
+          [MONDAY_COLUMNS.DOCKER_STATUS]: { label: data.dockerStatus || STATUS.DOCKER.RUNNING },
+          [MONDAY_COLUMNS.CONTAINER_ID]: data.containerId || 'N/A',
+          [MONDAY_COLUMNS.DOCKER_IMAGE_VERSION]: data.imageVersion || 'latest',
+          [MONDAY_COLUMNS.EXPOSED_PORTS]: data.ports || 'N/A',
+          [MONDAY_COLUMNS.HEALTH_STATUS]: data.health || 'healthy',
+          [MONDAY_COLUMNS.RESOURCE_USAGE]: data.resourceUsage || 'N/A',
+          [MONDAY_COLUMNS.DEPLOYMENT_TIMESTAMP]: data.deploymentTimestamp || new Date().toISOString().replace('T', ' ').substring(0, 19),
+          [MONDAY_COLUMNS.DEPLOY_STATUS]: { label: STATUS.STAGE.SUCCESS }
+        };
+
+      case 'docker_status_update':
+        return {
+          ...baseValues,
+          [MONDAY_COLUMNS.DOCKER_STATUS]: { label: data.dockerStatus || STATUS.DOCKER.RUNNING },
+          [MONDAY_COLUMNS.HEALTH_STATUS]: data.health || 'unknown',
+          [MONDAY_COLUMNS.RESOURCE_USAGE]: data.resourceUsage || 'N/A'
+        };
+
+      case 'docker_failed':
+        return {
+          ...baseValues,
+          [MONDAY_COLUMNS.DOCKER_STATUS]: { label: STATUS.DOCKER.FAILED },
+          [MONDAY_COLUMNS.DEPLOY_STATUS]: { label: STATUS.STAGE.FAILED },
+          [MONDAY_COLUMNS.BUILD_TIMELINE]: data.errorMessage || 'Docker deployment failed'
         };
 
       default:
