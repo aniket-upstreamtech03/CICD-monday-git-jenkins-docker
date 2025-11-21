@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  # Main application service
+  integration-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: integration-server-${ENV:-dev}
+    image: integration-server:${VERSION:-latest}
+    ports:
+      - "${PORT:-5000}:5000"
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=5000
+      - JENKINS_URL=${JENKINS_URL}
+      - JENKINS_USERNAME=${JENKINS_USERNAME}
+      - JENKINS_API_TOKEN=${JENKINS_API_TOKEN}
+      - JENKINS_JOB_NAME=${JENKINS_JOB_NAME}
+      - MONDAY_API_KEY=${MONDAY_API_KEY}
+      - MONDAY_BOARD_ID=${MONDAY_BOARD_ID}
+      - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
+    env_file:
+      - .env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:5000/health', (r) => { process.exit(r.statusCode === 200 ? 0 : 1); }).on('error', () => process.exit(1));"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - app-network
+    volumes:
+      # Mount logs directory for persistence
+      - ./logs:/app/logs
+    labels:
+      - "com.integration-server.environment=${ENV:-dev}"
+      - "com.integration-server.version=${VERSION:-latest}"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  app-network:
+    driver: bridge
+
+# Optional: Add volume for persistent data
+volumes:
+  app-logs:
+    driver: local
