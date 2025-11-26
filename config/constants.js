@@ -58,32 +58,32 @@ const STATUS = {
 // Column IDs for Monday.com (You'll need to get these from your board)
 const MONDAY_COLUMNS = {
   FEATURE_NAME: 'name',
-  GITHUB_STATUS: 'color_mkxt1jnm',
-  JENKINS_STATUS: 'color_mkxtrhcq',
-  PR_URL: 'text_mkxthvpn',
-  BUILD_URL: 'text_mkxt8btk',
-  DEVELOPER: 'text_mkxtt4m',          // Text column
-  REVIEWER: 'text_mkxtr8qw',          // Text column - who reviewed/merged PR
-  LAST_UPDATED: 'text_mkxtag7b',      // TEXT column (not date!)
-  COMMIT_MESSAGE: 'text_mkxtbdvy',    // Text column
-  TEST_STATUS: 'color_mkxt63hr',
-  BUILD_STATUS: 'color_mkxthsg8',
-  DEPLOY_STATUS: 'color_mkxtkmck',
-  BUILD_NUMBER: 'text_mkxtcexj',
-  TEST_COUNT: 'text_mkxtfqpp',
-  BUILD_TIMELINE: 'text_mkxtt63z',
-  REPO_NAME: 'text_mkxvrvpf',         // Repository name
-  REPO_URL: 'text_mkxvh80n',          // Repository URL
-  JENKINS_JOB_NAME: 'text_mkxvbrz7',  // Jenkins job name
+  GITHUB_STATUS: 'color_mky2zg3q',
+  JENKINS_STATUS: 'color_mky244c8',
+  PR_URL: 'text_mky2qw6k',
+  BUILD_URL: 'text_mky227nh',
+  DEVELOPER: 'text_mky2vtfe',          // Text column
+  REVIEWER: 'text_mky26tg9',          // Text column - who reviewed/merged PR
+  LAST_UPDATED: 'text_mky23kab',      // TEXT column (not date!)
+  COMMIT_MESSAGE: 'text_mky2xmj8',    // Text column
+  TEST_STATUS: 'color_mky23msf',
+  BUILD_STATUS: 'color_mky2cxt1',
+  DEPLOY_STATUS: 'color_mky2vr1n',
+  BUILD_NUMBER: 'text_mky2ye10',
+  TEST_COUNT: 'text_mky2qmkn',
+  BUILD_TIMELINE: 'text_mky2pen9',
+  REPO_NAME: 'text_mky26bgy',         // Repository name
+  REPO_URL: 'text_mky2jr0h',          // Repository URL
+  JENKINS_JOB_NAME: 'text_mky2jz4z',  // Jenkins job name
   
   // Docker-related columns
-  DOCKER_STATUS: 'color_mkxwnrwk',       // Status column - Running, Stopped, Failed
-  CONTAINER_ID: 'text_mkxw8jf6',         // Text column - Docker container ID
-  DOCKER_IMAGE_VERSION: 'text_mkxwjwx7', // Text column - Docker image version/tag
-  EXPOSED_PORTS: 'text_mkxw4nkd',        // Text column - Container exposed ports
-  HEALTH_STATUS: 'text_mkxwtatd',        // Text column - Container health status
-  RESOURCE_USAGE: 'text_mkxwhj7v',       // Text column - CPU/Memory usage
-  DEPLOYMENT_TIMESTAMP: 'text_mkxwpw82' // Text column - When container was deployed
+  DOCKER_STATUS: 'color_mky2jb8h',       // Status column - Running, Stopped, Failed
+  CONTAINER_ID: 'text_mky27qed',         // Text column - Docker container ID
+  DOCKER_IMAGE_VERSION: 'text_mky2m1h8', // Text column - Docker image version/tag
+  EXPOSED_PORTS: 'text_mky2zqmg',        // Text column - Container exposed ports
+  HEALTH_STATUS: 'text_mky2y7r',        // Text column - Container health status
+  RESOURCE_USAGE: 'text_mky22968',       // Text column - CPU/Memory usage
+  DEPLOYMENT_TIMESTAMP: 'text_mky2d1k3' // Text column - When container was deployed
 };
 
 // Helper function to extract Jenkins job name from repository name
